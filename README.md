@@ -47,7 +47,7 @@ sample-precise simulated outputs -- exactly what would be played on hardware.
    - Use the Ramsey method to find the precise value of the transition frequency.
    - Study how Ramsey works and implement it as a LabOne Q experiment.
 
-## Optional Stretch goals (choose or the other)
+## Optional Stretch goals (choose one or the other)
 
 ### Bell inequality violation
 
