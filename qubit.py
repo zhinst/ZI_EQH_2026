@@ -16,7 +16,7 @@ _IDENTITY_EMBED: Embedder = lambda O: O
 _WAIT_STEPS = 200
 
 
-class HiddenQubit:
+class VirtualQubit:
     """A single-qubit simulator whose physical parameters are hidden from the caller.
 
     Hidden parameters (set at construction and never exposed directly):
@@ -27,7 +27,7 @@ class HiddenQubit:
         _ro_err : single-shot readout bit-flip probability
 
     The qubit state is stored in ``self.state`` (a density matrix) and updated
-    in-place by :meth:`evolve`, :meth:`wait`, and :meth:`reset`.  Calls chain:
+    in-place by `evolve`, `wait`, and `reset`.  Calls chain:
 
         qubit.reset()
         qubit.evolve(t1, wave1, drive_freq)   # |0⟩ → ρ₁
@@ -35,7 +35,7 @@ class HiddenQubit:
         qubit.evolve(t2, wave2, drive_freq)   # ρ₂ → ρ₃
         bits = qubit.measure(shots=1000)      # sample from ρ₃
 
-    Call :meth:`reset` to explicitly return the qubit to |0⟩ before starting
+    Call `reset` to explicitly return the qubit to |0⟩ before starting
     a new experiment.
     """
 
@@ -44,7 +44,7 @@ class HiddenQubit:
 
     def __init__(self, seed: int | None = None) -> None:
         rng = np.random.default_rng(seed)
-        self._fq: float = rng.uniform(5.05e9, 5.15e9)
+        self._fq: float = rng.uniform(5.0e9, 6.0e9)
         self._T1: float = rng.uniform(20e-6, 40e-6)
         self._T2: float = rng.uniform(15e-6, 25e-6)
         self._omega: float = rng.uniform(0.9, 1.1) * (np.pi / 6.27e-8)
@@ -83,7 +83,7 @@ class HiddenQubit:
 
         Args:
             wave:       Complex envelope sampled on the same time grid used by
-                        :meth:`evolve`.  ``wave.real`` is the I component;
+                        `evolve`.  ``wave.real`` is the I component;
                         ``wave.imag`` is the Q component.
             drive_freq: LO + IF frequency of the drive signal [Hz].
             embed:      Optional operator embedding for multi-qubit contexts.
@@ -128,7 +128,7 @@ class HiddenQubit:
         """Propagate the qubit forward under a drive pulse, updating ``self.state``.
 
         The propagation starts from the current ``self.state``, so successive
-        calls chain automatically.  Use :meth:`reset` to start fresh from |0⟩.
+        calls chain automatically.  Use `reset` to start fresh from |0⟩.
 
         The time grid ``t`` should start at 0 — it is interpreted as relative
         time within the pulse, not absolute lab time.
@@ -150,7 +150,7 @@ class HiddenQubit:
         is useful for modelling idle time between gates, readout latency, or
         any period where the qubit is left undriven.
 
-        Like :meth:`evolve`, this updates ``self.state`` in-place so calls chain.
+        Like `evolve`, this updates ``self.state`` in-place so calls chain.
 
         Args:
             duration: Idle time [s].
@@ -172,7 +172,7 @@ class HiddenQubit:
         """Sample computational-basis outcomes from the current state.
 
         Reads ``self.state`` at call time, so the result always reflects the
-        most recent :meth:`evolve` or :meth:`wait`.  Can be called multiple
+        most recent `evolve` or `wait`.  Can be called multiple
         times after a single evolution without side effects on the state.
 
         Args:

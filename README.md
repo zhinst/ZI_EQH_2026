@@ -14,7 +14,7 @@ for us, we don't have access to a real qubit during the Hackaton. Fortunately fo
 
 ## How it works
 
-The virtual qubit lives in `qubit.py` as the `HiddenQubit` class. It starts in the
+The virtual qubit lives in `qubit.py` as the `VirtualQubit` class. It starts in the
 ground state and exposes three methods:
 
 - `evolve(t, wave, drive_freq)` propagates the state under your pulse waveform.

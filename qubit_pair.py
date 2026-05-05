@@ -16,10 +16,10 @@ class VirtualQubitPair:
     Each qubit can be individually driven by a LabOne Q waveform.  The pair is
     coupled via a transverse (XX + YY) exchange interaction of strength J.
 
-    Bell state preparation is the user's responsibility: drive the pair through
-    a calibrated pulse sequence using :meth:`evolve`.  See
-    :func:`experiments.Experiments.make_bell_prep_experiment` for a working
-    Hadamard + CNOT sequence implemented with Rx, Ry pulses and iSWAP waits.
+    Bell state preparation is the user's responsibility.
+    CHSH-optimal angles for the prepared state |Phi-> = (|00> - |11>) / sqrt(2):
+      (q0):  a = 0,        a' = pi/2
+      (q1):  b = -pi/4,    b' = +pi/4
 
     Typical experiment flow:
 
@@ -57,8 +57,7 @@ class VirtualQubitPair:
 
         Call this at the beginning of each new experiment to discard any
         previously accumulated state.  To prepare an entangled state, drive
-        the pair through a Bell preparation pulse sequence via :meth:`evolve`
-        (see :func:`experiments.Experiments.make_bell_prep_experiment`).
+        the pair through a Bell preparation pulse sequence via `evolve`.
         """
         self.state = self._GROUND_STATE
 
@@ -92,7 +91,7 @@ class VirtualQubitPair:
         """Assemble the full two-qubit drive Hamiltonian.
 
         Each qubit contributes its own single-qubit terms (detuning + IQ drive),
-        embedded into the two-qubit space via :meth:`_on_q0` / :meth:`_on_q1`.
+        embedded into the two-qubit space via `_on_q0` / `_on_q1`.
         """
         return (
             self.q0.hamiltonian_terms(wave_q0, drive_freq_q0, embed=self._on_q0)
@@ -140,7 +139,7 @@ class VirtualQubitPair:
         """Propagate the joint state forward under two drive pulses, updating ``self.state``.
 
         The propagation starts from the current ``self.state``, so successive
-        calls chain automatically.  Use :meth:`reset` to return to |00>.
+        calls chain automatically.  Use `reset` to return to |00>.
 
         The time grid ``t`` should start at 0 — it is interpreted as relative
         time within the pulse, not absolute lab time.
@@ -152,10 +151,8 @@ class VirtualQubitPair:
             drive_freq_q0: Drive frequency for qubit 0 [Hz].
             drive_freq_q1: Drive frequency for qubit 1 [Hz].
             coupling_on:   Whether the qubit-qubit ZZ coupling is active during
-                           this segment.  In real flux-tunable hardware the
-                           coupling is gated on only during entangling-gate
-                           windows; default ``False`` means single-qubit pulses
-                           do not pick up unwanted coupling phase.
+                           this segment. default ``False`` means single-qubit
+                           pulses do not pick up unwanted coupling phase.
         """
         H = self._drive_hamiltonian(wave_q0, wave_q1, drive_freq_q0, drive_freq_q1)
         if coupling_on:
@@ -192,7 +189,7 @@ class VirtualQubitPair:
         flux-tunable hardware where the coupling is gated).  Set ``coupling_on``
         to True to model an entangling-gate-equivalent free evolution.
 
-        Like :meth:`evolve`, this updates ``self.state`` in-place so calls chain.
+        Like `evolve`, this updates ``self.state`` in-place so calls chain.
 
         Args:
             duration:    Idle time [s].
@@ -213,7 +210,7 @@ class VirtualQubitPair:
         """Sample computational-basis outcomes from the current state.
 
         Reads ``self.state`` at call time, so the result always reflects the
-        most recent :meth:`evolve` or :meth:`wait`.  Can be called multiple
+        most recent `evolve` or `wait`.  Can be called multiple
         times after a single evolution without side effects on the state.
 
         Each shot yields a pair of bits (b0, b1) ∈ {0, 1}², drawn from the
