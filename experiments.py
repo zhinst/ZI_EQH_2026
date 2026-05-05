@@ -140,35 +140,92 @@ class Experiments:
         )
         return exp
 
-    def make_bell_prep_experiment(
+    def make_bell_prep_pulses_pre(
         self,
         f_drive_q0,
+        f_drive_q1,
         amp_pi_q0,
+        amp_pi_q1,
         lo=5.0e9,
-        pulse_length=300e-9,
+        pulse_length=PULSE_LEN,
     ):
-        """Apply Ry(pi/2) to q0 only, leaving q1 idle.
+        """Pulses played BEFORE the CPHASE gate: Hadamard on both qubits.
 
-        This is the first step of Bell state preparation: putting q0 into
-        the superposition (|0> + |1>) / sqrt(2).  The second step is a wait
-        whose duration equals pi / (2 * J_coupling), which lets the XX+YY
-        exchange coupling act as an entangling gate.  The user must determine
-        the correct wait time by characterising the coupling strength J.
+        Layer 1: Ry_q0(+pi/2),   Ry_q1(+pi/2)            [Hadamards]
         """
+        return self._make_layer_experiment(
+            [[(0, "y", +np.pi / 2), (1, "y", +np.pi / 2)]],
+            f_drive_q0, f_drive_q1, amp_pi_q0, amp_pi_q1, lo, pulse_length,
+        )
+
+    def make_bell_prep_pulses_post(
+        self,
+        f_drive_q0,
+        f_drive_q1,
+        amp_pi_q0,
+        amp_pi_q1,
+        lo=5.0e9,
+        pulse_length=PULSE_LEN,
+    ):
+        """Pulses played AFTER the CPHASE gate: Rz(-pi/2) on both + final Ry on q1.
+
+        Layer 1: Rx_q0(-pi/2),   Rx_q1(-pi/2)            [Rz part 1]
+        Layer 2: Ry_q0(-pi/2),   Ry_q1(-pi/2)            [Rz part 2]
+        Layer 3: Rx_q0(+pi/2),   Rx_q1(+pi/2)            [Rz part 3]
+        Layer 4: idle q0,        Ry_q1(-pi/2)            [final]
+
+        Together with the pre-CPHASE Hadamards and the CPHASE wait, this
+        produces |Phi-> = (|00> - |11>) / sqrt(2).  CHSH-optimal Bob angles
+        are ``-pi/4, +pi/4`` (signs flipped relative to |Phi+>).
+        """
+        return self._make_layer_experiment(
+            [
+                [(0, "x", -np.pi / 2), (1, "x", -np.pi / 2)],
+                [(0, "y", -np.pi / 2), (1, "y", -np.pi / 2)],
+                [(0, "x", +np.pi / 2), (1, "x", +np.pi / 2)],
+                [None,                  (1, "y", -np.pi / 2)],
+            ],
+            f_drive_q0, f_drive_q1, amp_pi_q0, amp_pi_q1, lo, pulse_length,
+        )
+
+    def _make_layer_experiment(
+        self,
+        layers,
+        f_drive_q0,
+        f_drive_q1,
+        amp_pi_q0,
+        amp_pi_q1,
+        lo,
+        pulse_length,
+    ):
+        """Build a 2-qubit pulse experiment from a list of parallel-gate layers."""
         exp = Experiment(
             signals=[ExperimentSignal("q0_drive"), ExperimentSignal("q1_drive")]
         )
         pulse = pulse_library.gaussian(uid="ry_half", length=pulse_length, amplitude=1.0)
+        amp_pi = [amp_pi_q0, amp_pi_q1]
+        signal_names = ["q0_drive", "q1_drive"]
+
+        def _phase(axis):
+            return 0.0 if axis == "x" else np.pi / 2
 
         with exp.acquire_loop_rt(count=1):
-            exp.play(
-                "q0_drive",
-                pulse,
-                amplitude=-(0.5 / np.pi) * amp_pi_q0,  # Ry(pi/2): half a pi pulse
-                phase=np.pi / 2,
-            )
-            exp.delay("q0_drive", time=200e-9)
-            exp.delay("q1_drive", time=pulse_length + 200e-9)
+            for layer in layers:
+                for q_gate in layer:
+                    if q_gate is None:
+                        continue
+                    q_idx, axis, angle = q_gate
+                    exp.play(
+                        signal_names[q_idx],
+                        pulse,
+                        amplitude=-(angle / np.pi) * amp_pi[q_idx],
+                        phase=_phase(axis),
+                    )
+                # Idle the qubit that didn't get a pulse this layer
+                played = {g[0] for g in layer if g is not None}
+                for q_idx in (0, 1):
+                    if q_idx not in played:
+                        exp.delay(signal_names[q_idx], time=pulse_length)
 
         cal = Calibration(
             {
@@ -182,7 +239,7 @@ class Experiments:
                 ),
                 "q1_drive": SignalCalibration(
                     oscillator=Oscillator(
-                        frequency=f_drive_q0 - lo,  # idle; freq doesn't matter
+                        frequency=f_drive_q1 - lo,
                         modulation_type=ModulationType.HARDWARE,
                     ),
                     local_oscillator=Oscillator(frequency=lo),
@@ -198,6 +255,7 @@ class Experiments:
             }
         )
         return exp
+
 
     def get_waveform(self, compiled, pulse_length=1000.0):
         sim = OutputSimulator(compiled)

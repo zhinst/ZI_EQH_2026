@@ -4,72 +4,63 @@ import numpy as np
 import numpy.typing as npt
 import qutip as qt
 
-from qubit import VirtualQubit
+from qubit import HiddenQubit
 
 # Default time resolution for wait() free-evolution segments.
 _WAIT_STEPS = 200
 
 
-class HiddenQubitPair:
-    """A two-qubit simulator that prepares a noisy Bell state |Φ+⟩ = (|00⟩ + |11⟩) / √2.
+class VirtualQubitPair:
+    """A two-qubit simulator initialised in the joint ground state |00>.
 
     Each qubit can be individually driven by a LabOne Q waveform.  The pair is
     coupled via a transverse (XX + YY) exchange interaction of strength J.
 
-    The joint state is stored in ``self.state`` (a 4×4 density matrix) and
-    updated in-place by :meth:`evolve`, :meth:`wait`, and :meth:`reset`.
-    Calls chain:
+    Bell state preparation is the user's responsibility: drive the pair through
+    a calibrated pulse sequence using :meth:`evolve`.  See
+    :func:`experiments.Experiments.make_bell_prep_experiment` for a working
+    Hadamard + CNOT sequence implemented with Rx, Ry pulses and iSWAP waits.
 
-        pair.reset()
-        pair.evolve(t1, w0_1, w1_1, f0, f1)   # Bell → ρ₁
-        pair.wait(500e-9)                       # ρ₁ → ρ₂  (free decay)
-        pair.evolve(t2, w0_2, w1_2, f0, f1)   # ρ₂ → ρ₃
-        bits = pair.measure(shots=4000)         # sample from ρ₃
+    Typical experiment flow:
 
-    Call :meth:`reset` to return the pair to the initial Bell state before
-    starting a new experiment.
+        pair.reset()                              # |00>
+        pair.evolve(t_prep, w0, w1, f0, f1)       # drive Bell prep -> |Phi->
+        pair.evolve(t_meas, w0, w1, f0, f1)       # rotate into measurement basis
+        bits = pair.measure(shots=4000)           # sample
 
     Args:
-        q0:               First qubit.
-        q1:               Second qubit.
-        prep_visibility:  Mixing weight between the ideal Bell state and the
-                          maximally mixed state (1 → pure Bell, 0 → fully mixed).
-        J_coupling:       Exchange coupling strength [rad/s].
+        q0:         First qubit.
+        q1:         Second qubit.
+        J_coupling: Exchange coupling strength [rad/s].
     """
+
+    # Ground state |00> as a density matrix.
+    _GROUND_STATE: qt.Qobj = qt.tensor(qt.basis(2, 0), qt.basis(2, 0)).proj()
 
     def __init__(
         self,
-        q0: VirtualQubit,
-        q1: VirtualQubit,
-        prep_visibility: float = 0.97,
+        q0: HiddenQubit,
+        q1: HiddenQubit,
         J_coupling: float = 2 * np.pi * 3e6,
     ) -> None:
         self.q0 = q0
         self.q1 = q1
-        self._visibility = prep_visibility
         self._J = J_coupling
-        self.state: qt.Qobj = self._make_bell_state()
+        self.state: qt.Qobj = self._GROUND_STATE
 
     # ------------------------------------------------------------------
     # State lifecycle
     # ------------------------------------------------------------------
 
     def reset(self) -> None:
-        """Reset the pair to the prepared Bell state |Φ+⟩.
+        """Reset the pair to the joint ground state |00>.
 
         Call this at the beginning of each new experiment to discard any
-        previously accumulated state.
+        previously accumulated state.  To prepare an entangled state, drive
+        the pair through a Bell preparation pulse sequence via :meth:`evolve`
+        (see :func:`experiments.Experiments.make_bell_prep_experiment`).
         """
-        self.state = self._make_bell_state()
-
-    def _make_bell_state(self) -> qt.Qobj:
-        """Prepare a visibility-weighted mixture of |Φ+⟩ and the maximally mixed state."""
-        bell = (
-            qt.tensor(qt.basis(2, 0), qt.basis(2, 0))
-            + qt.tensor(qt.basis(2, 1), qt.basis(2, 1))
-        ).unit()
-        maximally_mixed = qt.tensor(qt.qeye(2), qt.qeye(2)) / 4
-        return self._visibility * bell.proj() + (1 - self._visibility) * maximally_mixed
+        self.state = self._GROUND_STATE
 
     # ------------------------------------------------------------------
     # Two-qubit operator constructors
@@ -103,43 +94,35 @@ class HiddenQubitPair:
         Each qubit contributes its own single-qubit terms (detuning + IQ drive),
         embedded into the two-qubit space via :meth:`_on_q0` / :meth:`_on_q1`.
         """
-        return self.q0.hamiltonian_terms(
-            wave_q0, drive_freq_q0, embed=self._on_q0
-        ) + self.q1.hamiltonian_terms(wave_q1, drive_freq_q1, embed=self._on_q1)
+        return (
+            self.q0.hamiltonian_terms(wave_q0, drive_freq_q0, embed=self._on_q0)
+            + self.q1.hamiltonian_terms(wave_q1, drive_freq_q1, embed=self._on_q1)
+        )
 
     def _coupling_hamiltonian(self) -> list:
-        """Build the time-dependent XX + YY exchange coupling between the qubits.
+        """Build the static ZZ coupling H = (J/2) * Z0 * Z1.
 
-        In the rotating frame, the qubit–qubit detuning Δ = ω_q0 − ω_q1 causes
-        the coupling to oscillate at Δ.  The result is expressed as two
-        time-dependent terms (real and imaginary parts) in QuTiP format.
+        ZZ-type coupling is the natural source of CPHASE gates in
+        superconducting hardware (e.g. via the |11>-|02> avoided crossing in
+        flux-tunable transmons).  Evolution for time pi/(2J) gives
+        exp(-i*pi/4 * Z0*Z1), which combined with single-qubit Rz(-pi/2) on
+        each qubit realises a CPHASE gate.
+
+        Importantly, [ZZ, Z_i] = 0, so the gate commutes with per-qubit
+        detunings and is unaffected by qubit-frequency mismatches.
 
         Returns:
-            QuTiP-format list of ``[operator, coeff_fn]`` pairs.
+            Static QuTiP operator for the coupling Hamiltonian.
         """
-        raise_q0_lower_q1 = self._on_q0(qt.sigmap()) * self._on_q1(qt.sigmam())
-        lower_q0_raise_q1 = self._on_q0(qt.sigmam()) * self._on_q1(qt.sigmap())
-        exchange = raise_q0_lower_q1 + lower_q0_raise_q1
-
-        # Oscillation frequency = difference of qubit resonance frequencies
-        delta = 2 * np.pi * (self.q0._fq - self.q1._fq)
-
-        def coupling_cos(t: float, args: dict | None = None) -> float:
-            return 0.5 * self._J * np.cos(delta * t)
-
-        def coupling_sin(t: float, args: dict | None = None) -> float:
-            return 0.5 * self._J * np.sin(delta * t)
-
-        return [
-            [exchange, coupling_cos],  # real part
-            [1j * (raise_q0_lower_q1 - lower_q0_raise_q1), coupling_sin],  # imag part
-        ]
+        ZZ = self._on_q0(qt.sigmaz()) * self._on_q1(qt.sigmaz())
+        return [0.5 * self._J * ZZ]
 
     def _collapse_operators(self) -> list[qt.Qobj]:
         """Collect Lindblad collapse operators for both qubits, embedded in the 4D space."""
-        return self.q0.collapse_operators(
-            embed=self._on_q0
-        ) + self.q1.collapse_operators(embed=self._on_q1)
+        return (
+            self.q0.collapse_operators(embed=self._on_q0)
+            + self.q1.collapse_operators(embed=self._on_q1)
+        )
 
     # ------------------------------------------------------------------
     # State evolution
@@ -152,11 +135,12 @@ class HiddenQubitPair:
         wave_q1: npt.NDArray[np.complex128],
         drive_freq_q0: float,
         drive_freq_q1: float,
+        coupling_on: bool = False,
     ) -> None:
         """Propagate the joint state forward under two drive pulses, updating ``self.state``.
 
         The propagation starts from the current ``self.state``, so successive
-        calls chain automatically.  Use :meth:`reset` to return to the Bell state.
+        calls chain automatically.  Use :meth:`reset` to return to |00>.
 
         The time grid ``t`` should start at 0 — it is interpreted as relative
         time within the pulse, not absolute lab time.
@@ -167,32 +151,58 @@ class HiddenQubitPair:
             wave_q1:       Complex drive envelope for qubit 1, shape ``(N,)``.
             drive_freq_q0: Drive frequency for qubit 0 [Hz].
             drive_freq_q1: Drive frequency for qubit 1 [Hz].
+            coupling_on:   Whether the qubit-qubit ZZ coupling is active during
+                           this segment.  In real flux-tunable hardware the
+                           coupling is gated on only during entangling-gate
+                           windows; default ``False`` means single-qubit pulses
+                           do not pick up unwanted coupling phase.
         """
         H = self._drive_hamiltonian(wave_q0, wave_q1, drive_freq_q0, drive_freq_q1)
-        H += self._coupling_hamiltonian()
+        if coupling_on:
+            H += self._coupling_hamiltonian()
         c_ops = self._collapse_operators()
         result = qt.mesolve(H, self.state, t, c_ops=c_ops, e_ops=[])
         self.state = result.states[-1]
 
-    def wait(self, duration: float, n_steps: int = _WAIT_STEPS) -> None:
+    def cphase(self, j_coupling: float | None = None, n_steps: int = _WAIT_STEPS) -> None:
+        """Apply a CPHASE gate by turning on ZZ coupling for time pi/(2J).
+
+        This represents the flux-pulse-mediated entangling gate used in
+        superconducting hardware: the coupling is briefly switched on for
+        exactly the right duration to accumulate a pi-phase on |11>.
+
+        Args:
+            j_coupling: ZZ coupling strength to use [rad/s].  Defaults to the
+                        pair's ``_J``.
+            n_steps:    Number of time steps for the mesolve integration.
+        """
+        J = self._J if j_coupling is None else j_coupling
+        duration = np.pi / (2 * J)
+        t = np.linspace(0, duration, n_steps)
+        H = self._coupling_hamiltonian()
+        c_ops = self._collapse_operators()
+        result = qt.mesolve(H, self.state, t, c_ops=c_ops, e_ops=[])
+        self.state = result.states[-1]
+
+    def wait(self, duration: float, n_steps: int = _WAIT_STEPS, coupling_on: bool = False) -> None:
         """Let both qubits decay freely for ``duration`` seconds under zero drive.
 
         No pulses are applied — only the T1 / T2 Lindblad channels of each qubit
-        and the exchange coupling act.  This is useful for modelling idle time
-        between two-qubit gate layers or entanglement generation latency.
+        act.  By default the qubit-qubit coupling is OFF (matching real
+        flux-tunable hardware where the coupling is gated).  Set ``coupling_on``
+        to True to model an entangling-gate-equivalent free evolution.
 
         Like :meth:`evolve`, this updates ``self.state`` in-place so calls chain.
 
         Args:
-            duration: Idle time [s].
-            n_steps:  Number of time steps for the mesolve integration.
-                      More steps give higher accuracy for long idles; the
-                      default of 200 is sufficient for durations up to ~T1.
+            duration:    Idle time [s].
+            n_steps:     Number of time steps for the mesolve integration.
+            coupling_on: Whether to include the qubit-qubit ZZ coupling.
         """
         t = np.linspace(0, duration, n_steps)
-        H_zero = qt.Qobj(np.zeros((4, 4)))
+        H = self._coupling_hamiltonian() if coupling_on else [qt.tensor(qt.qeye(2), qt.qeye(2)) * 0]
         c_ops = self._collapse_operators()
-        result = qt.mesolve(H_zero, self.state, t, c_ops=c_ops, e_ops=[])
+        result = qt.mesolve(H, self.state, t, c_ops=c_ops, e_ops=[])
         self.state = result.states[-1]
 
     # ------------------------------------------------------------------
@@ -241,7 +251,9 @@ class HiddenQubitPair:
             for a in (0, 1)
             for b in (0, 1)
         ]
-        probs = np.array([abs((P * self.state).tr()) for P in projectors], dtype=float)
+        probs = np.array(
+            [abs((P * self.state).tr()) for P in projectors], dtype=float
+        )
         probs = np.clip(probs, 0, None)
         probs /= probs.sum()
         return probs

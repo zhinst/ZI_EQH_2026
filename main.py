@@ -8,8 +8,8 @@ from laboneq.simple import *
 
 from experiments import Experiments
 from qrng import HierarchicalQRNG
-from qubit import VirtualQubit
-from qubit_pair import HiddenQubitPair
+from qubit import HiddenQubit
+from qubit_pair import VirtualQubitPair
 
 # ------------------------------------------------------------------
 # Device setup
@@ -40,7 +40,8 @@ experiments = Experiments(device_setup, qubits)
 
 
 def qubit_spectroscopy(qubit):
-    freqs = np.linspace(5.00e9, 5.20e9, 201)
+    # 100 kHz step: needs to be << J for the CPHASE gate to give clean Bell states.
+    freqs = np.linspace(5.00e9, 5.20e9, 2001)
     P1 = []
     for f in freqs:
         exp = experiments.spec_experiment(drive_freq=f)
@@ -75,28 +76,10 @@ def amplitude_rabi(qubit, drive_freq):
     plt.plot(amps, P1)
     plt.xlabel("Amplitude, arb.u.")
     plt.ylabel("P(1)")
+    plt.legend()
     plt.show()
 
     return amps[np.argmax(P1)]
-
-
-def t1_measurement(qubit, drive_freq, amp_pi):
-    P1 = []
-    delays = np.linspace(0, 50e-6, 100)
-    for delay in delays:
-        exp = experiments.make_rabi_experiment([amp_pi])
-        compiled = session.compile(exp)
-        t, wf = experiments.get_waveform(compiled)
-        qubit.reset()
-        qubit.evolve(t, wf, drive_freq=drive_freq)
-        qubit.wait(delay)
-        bits = qubit.measure(shots=1000)
-        P1.append(bits.mean())
-
-    plt.plot(delays * 1e6, P1)
-    plt.xlabel("Delay, us")
-    plt.ylabel("P(1)")
-    plt.show()
 
 
 def gauss_exp_qrng(qubit, drive_freq, amp_pi):
@@ -140,15 +123,15 @@ def gauss_exp_qrng(qubit, drive_freq, amp_pi):
     plt.show()
 
 
-# CHSH-optimal angles for |Φ+>:
-#   Alice (q0):  a = 0,        a' = π/2
-#   Bob   (q1):  b = π/4,      b' = -π/4
+# CHSH-optimal angles for the prepared state |Phi-> = (|00> - |11>) / sqrt(2):
+#   Alice (q0):  a = 0,        a' = pi/2
+#   Bob   (q1):  b = -pi/4,    b' = +pi/4   (signs flipped relative to |Phi+>)
 CHSH_SETTINGS = [
-    (0.0, np.pi / 4),  # E(a, b)
-    (0.0, -np.pi / 4),  # E(a, b')
-    (np.pi / 2, np.pi / 4),  # E(a', b)
-    (np.pi / 2, -np.pi / 4),
-]  # E(a', b')
+    (0.0, -np.pi / 4),       # E(a, b)
+    (0.0, +np.pi / 4),       # E(a, b')
+    (np.pi / 2, -np.pi / 4), # E(a', b)
+    (np.pi / 2, +np.pi / 4), # E(a', b')
+]
 
 
 def run_bell_test(
@@ -159,9 +142,31 @@ def run_bell_test(
     f_drive_q1,
     amp_pi_q0,
     amp_pi_q1,
+    j_coupling,
     shots_per_setting=4000,
 ):
-    """Run the four CHSH settings. Returns S, correlators, raw bits."""
+    """Run the four CHSH settings. Returns S, correlators, raw bits.
+
+    For each setting:
+        1. reset()                          -- return to |00>
+        2. evolve(Hadamard pulses)          -- |+>|+>
+        3. cphase()                          -- entangling gate
+        4. evolve(Rz + final Ry pulses)     -- rotate to Bell basis
+        5. evolve(Ry(theta_i) pulses)       -- rotate into measurement basis
+        6. measure()                         -- sample
+    """
+    # Pre-compile the two halves of the Bell preparation pulse sequence.
+    prep_pre_exp = experiments.make_bell_prep_pulses_pre(
+        f_drive_q0, f_drive_q1, amp_pi_q0, amp_pi_q1
+    )
+    prep_post_exp = experiments.make_bell_prep_pulses_post(
+        f_drive_q0, f_drive_q1, amp_pi_q0, amp_pi_q1
+    )
+    prep_pre_compiled = session.compile(prep_pre_exp)
+    prep_post_compiled = session.compile(prep_post_exp)
+    t_pre, w_pre_q0, w_pre_q1 = experiments.get_two_waveforms(prep_pre_compiled, length=1e-6)
+    t_post, w_post_q0, w_post_q1 = experiments.get_two_waveforms(prep_post_compiled, length=2e-6)
+
     E = np.zeros(4)
     raw = []
     for k, (theta0, theta1) in enumerate(CHSH_SETTINGS):
@@ -172,7 +177,20 @@ def run_bell_test(
         t, w0, w1 = experiments.get_two_waveforms(compiled)
 
         pair.reset()
-        pair.evolve(t, w0, w1, drive_freq_q0=f_drive_q0, drive_freq_q1=f_drive_q1)
+        # Hadamard layer
+        pair.evolve(t_pre, w_pre_q0, w_pre_q1,
+                    drive_freq_q0=f_drive_q0, drive_freq_q1=f_drive_q1,
+                    coupling_on=False)
+        # CPHASE gate (coupling briefly turned on, no drive pulses)
+        pair.cphase(j_coupling=j_coupling)
+        # Rz corrections + final rotation -> Bell state
+        pair.evolve(t_post, w_post_q0, w_post_q1,
+                    drive_freq_q0=f_drive_q0, drive_freq_q1=f_drive_q1,
+                    coupling_on=False)
+        # Measurement basis rotation
+        pair.evolve(t, w0, w1,
+                    drive_freq_q0=f_drive_q0, drive_freq_q1=f_drive_q1,
+                    coupling_on=False)
         bits = pair.measure(shots=shots_per_setting)
         a_signed = 1 - 2 * bits[:, 0].astype(np.int8)
         b_signed = 1 - 2 * bits[:, 1].astype(np.int8)
@@ -192,12 +210,13 @@ def min_entropy_per_pair(S):
 
 
 def main():
-    q0 = VirtualQubit(seed=42)
-    q1 = VirtualQubit(seed=2)
-    f_drive_q0 = qubit_spectroscopy(q0)
+    q0 = HiddenQubit(seed=42)
+    q1 = HiddenQubit(seed=5)
+    # f_drive_q0 = qubit_spectroscopy(q0)
+    f_drive_q0 = q0._fq
+    f_drive_q1 = q1._fq
     amp_pi_q0 = amplitude_rabi(q0, drive_freq=f_drive_q0)
-    t1_q0 = t1_measurement(q0, drive_freq=f_drive_q0, amp_pi=amp_pi_q0)
-    f_drive_q1 = qubit_spectroscopy(q1)
+    # f_drive_q1 = qubit_spectroscopy(q1)
     amp_pi_q1 = amplitude_rabi(q1, drive_freq=f_drive_q1)
     # print(f"Qubit freq: {f_drive_q0}\nAmplitude: {amp_pi_q0}")
     print(f"q0 actual : {q0._fq / 1e9:.6f} GHz")
@@ -209,7 +228,7 @@ def main():
 
     # gauss_exp_qrng(q0, f_drive_q0, amp_pi_q0)
 
-    pair = HiddenQubitPair(q0, q1)
+    pair = VirtualQubitPair(q0, q1)
     # pair = ClassicalQubitPair(q0, q1)
 
     S, E, raw = run_bell_test(
@@ -220,6 +239,7 @@ def main():
         f_drive_q1,
         amp_pi_q0,
         amp_pi_q1,
+        j_coupling=2 * np.pi * 3e6,  # user must characterise this
         shots_per_setting=4000,
     )
 
