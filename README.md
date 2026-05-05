@@ -1,4 +1,8 @@
-# Challenge: Tune-up of a virtual qubit with LabOne Q
+# Tune-up of a virtual qubit with LabOne Q
+
+In this hackaton challenge you will tune up a virtual qubit using ![*LabOne Q*](https://www.zhinst.com/ch/en/quantum-computing-systems/labone-q/) through a standard superconducting-qubit calibration sequence: qubit spectroscopy, amplitude Rabi, T₁ measurement, and Ramsey interferometry. Each step is implemented as a LabOne Q experiment whose simulated pulses drive the virtual qubit. Optional stretch goals are to implement Bell inequality test on an entangled qubit pair or a code a native LabOne Q readout implementation.
+
+## Summary
 
 ![*LabOne Q*](https://www.zhinst.com/ch/en/quantum-computing-systems/labone-q/) is the Python-based framework for quantum computing using the quantum control systems of Zurich Instruments. In this challenge you will use LabOne Q to play pulses and tune-up a virtual qubit implemented with ![*QuTIP*](https://qutip.org/).
 
@@ -66,6 +70,28 @@ Tip: Keep in mind that you need **very good** knowledge of the qubit frequency a
 The current `measure` is a Python call. Build the readout as a real LabOne Q
 experiment: a readout pulse, an acquisition window, and an integration kernel —
 all defined through the DSL.
+
+## Setup
+
+This project requires Python 3.14 or newer. The instructions below use `venv`
+(built into Python); `conda` or `uv` work equally well.
+
+```bash
+# 1. Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate          # macOS / Linux
+# .venv\Scripts\activate           # Windows PowerShell
+
+# 2. Install the project and its dependencies
+pip install --upgrade pip
+pip install -e .
+```
+
+Once activated, run the challenge entry point with:
+
+```bash
+python main.py
+```
 
 ## Tips
 
