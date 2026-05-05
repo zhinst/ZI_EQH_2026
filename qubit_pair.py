@@ -93,10 +93,9 @@ class VirtualQubitPair:
         Each qubit contributes its own single-qubit terms (detuning + IQ drive),
         embedded into the two-qubit space via `_on_q0` / `_on_q1`.
         """
-        return (
-            self.q0.hamiltonian_terms(wave_q0, drive_freq_q0, embed=self._on_q0)
-            + self.q1.hamiltonian_terms(wave_q1, drive_freq_q1, embed=self._on_q1)
-        )
+        return self.q0.hamiltonian_terms(
+            wave_q0, drive_freq_q0, embed=self._on_q0
+        ) + self.q1.hamiltonian_terms(wave_q1, drive_freq_q1, embed=self._on_q1)
 
     def _coupling_hamiltonian(self) -> list:
         """Build the static ZZ coupling H = (J/2) * Z0 * Z1.
@@ -118,10 +117,9 @@ class VirtualQubitPair:
 
     def _collapse_operators(self) -> list[qt.Qobj]:
         """Collect Lindblad collapse operators for both qubits, embedded in the 4D space."""
-        return (
-            self.q0.collapse_operators(embed=self._on_q0)
-            + self.q1.collapse_operators(embed=self._on_q1)
-        )
+        return self.q0.collapse_operators(
+            embed=self._on_q0
+        ) + self.q1.collapse_operators(embed=self._on_q1)
 
     # ------------------------------------------------------------------
     # State evolution
@@ -161,7 +159,9 @@ class VirtualQubitPair:
         result = qt.mesolve(H, self.state, t, c_ops=c_ops, e_ops=[])
         self.state = result.states[-1]
 
-    def cphase(self, j_coupling: float | None = None, n_steps: int = _WAIT_STEPS) -> None:
+    def cphase(
+        self, j_coupling: float | None = None, n_steps: int = _WAIT_STEPS
+    ) -> None:
         """Apply a CPHASE gate by turning on ZZ coupling for time pi/(2J).
 
         This represents the flux-pulse-mediated entangling gate used in
@@ -181,7 +181,9 @@ class VirtualQubitPair:
         result = qt.mesolve(H, self.state, t, c_ops=c_ops, e_ops=[])
         self.state = result.states[-1]
 
-    def wait(self, duration: float, n_steps: int = _WAIT_STEPS, coupling_on: bool = False) -> None:
+    def wait(
+        self, duration: float, n_steps: int = _WAIT_STEPS, coupling_on: bool = False
+    ) -> None:
         """Let both qubits decay freely for ``duration`` seconds under zero drive.
 
         No pulses are applied — only the T1 / T2 Lindblad channels of each qubit
@@ -197,7 +199,11 @@ class VirtualQubitPair:
             coupling_on: Whether to include the qubit-qubit ZZ coupling.
         """
         t = np.linspace(0, duration, n_steps)
-        H = self._coupling_hamiltonian() if coupling_on else [qt.tensor(qt.qeye(2), qt.qeye(2)) * 0]
+        H = (
+            self._coupling_hamiltonian()
+            if coupling_on
+            else [qt.tensor(qt.qeye(2), qt.qeye(2)) * 0]
+        )
         c_ops = self._collapse_operators()
         result = qt.mesolve(H, self.state, t, c_ops=c_ops, e_ops=[])
         self.state = result.states[-1]
@@ -248,9 +254,7 @@ class VirtualQubitPair:
             for a in (0, 1)
             for b in (0, 1)
         ]
-        probs = np.array(
-            [abs((P * self.state).tr()) for P in projectors], dtype=float
-        )
+        probs = np.array([abs((P * self.state).tr()) for P in projectors], dtype=float)
         probs = np.clip(probs, 0, None)
         probs /= probs.sum()
         return probs

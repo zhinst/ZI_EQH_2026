@@ -28,6 +28,7 @@ compiling it, and feeding the resulting waveform into `evolve`. We don't have a
 real qubit during the hackathon, but LabOne Q's emulation mode gives you
 sample-precise simulated outputs -- exactly what would be played on hardware.
 
+
 ## Tasks
 
 1. **Find the qubit's transition frequency.** Spectroscopy: sweep the drive
@@ -95,5 +96,37 @@ python main.py
 
 ## Tips
 
-1. Start from the [*OutputSimulator*](https://docs.zhinst.com/labone_q_user_manual/core/functionality_and_concepts/10_advanced_topics/tutorials/00_output_simulator.html) tutorial. Run through the tutorial and see how the output pulses look like. Make a function that takes the output and converts it to the format used by the `VirtualQubit`.
-2. Learn more about [*Qubit Spectroscopy*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/03_qubit_spectroscopy.html), [*Amplitude Rabi*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/04_amplitude_rabi.html), and [*Ramsey Interferometry*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/05_ramsey.html) from the LabOne Q Applications library documentation.
+1. Start from the ![*OutputSimulator*](https://docs.zhinst.com/labone_q_user_manual/core/functionality_and_concepts/10_advanced_topics/tutorials/00_output_simulator.html) tutorial. Run through the tutorial and see how the output pulses look like. Make a function that takes the output and converts it to the format used by the `VirtualQubit`.
+2. Learn more about ![*Qubit Spectroscopy*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/03_qubit_spectroscopy.html), ![*Amplitude Rabi*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/04_amplitude_rabi.html), and ![*Ramsey Interferometry*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/05_ramsey.html) from the LabOne Q Applications library documentation.
+
+## Example code to get you started
+
+```python
+# LabOne Q setup
+device_setup, qubits = generate_device_setup_qubits(...)
+session = Session(device_setup)
+session.connect(do_emulation=True)
+
+# Define your experiments
+def qubit_spectroscopy(qubit):
+    freqs = np.linspace(5.00e9, 6.20e9, 101)
+    P1 = []
+    for f in freqs:
+        exp = experiments.spec_experiment(drive_freq=f)
+        compiled = session.compile(exp)
+        t, wf = experiments.get_waveform(compiled, pulse_length=2e-6)
+        qubit.reset()
+        qubit.evolve(t, wf, drive_freq=f)
+        bits = qubit.measure(shots=10000)
+        P1.append(bits.mean())
+    return freqs, P1
+
+def main():
+    # Start the qubit with a defined seed
+    # for the RNG for deterministic results
+    q0 = VirtualQubit(seed=42)
+    freqs, P1 = qubit_spectroscopy(q0)
+    f_drive_q0 = fit_lorentzian(freqs, P1)
+    amp_pi_q0 = amplitude_rabi(q0, drive_freq=f_drive_q0)
+    ...
+```
