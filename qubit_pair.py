@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 import qutip as qt
 
-from qubit import HiddenQubit
+from qubit import VirtualQubit
 
 # Default time resolution for wait() free-evolution segments.
 _WAIT_STEPS = 200
@@ -39,8 +39,8 @@ class HiddenQubitPair:
 
     def __init__(
         self,
-        q0: HiddenQubit,
-        q1: HiddenQubit,
+        q0: VirtualQubit,
+        q1: VirtualQubit,
         prep_visibility: float = 0.97,
         J_coupling: float = 2 * np.pi * 3e6,
     ) -> None:

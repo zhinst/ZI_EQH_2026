@@ -8,7 +8,7 @@ from laboneq.simple import *
 
 from experiments import Experiments
 from qrng import HierarchicalQRNG
-from qubit import HiddenQubit
+from qubit import VirtualQubit
 from qubit_pair import HiddenQubitPair
 
 # ------------------------------------------------------------------
@@ -192,8 +192,8 @@ def min_entropy_per_pair(S):
 
 
 def main():
-    q0 = HiddenQubit(seed=42)
-    q1 = HiddenQubit(seed=2)
+    q0 = VirtualQubit(seed=42)
+    q1 = VirtualQubit(seed=2)
     f_drive_q0 = qubit_spectroscopy(q0)
     amp_pi_q0 = amplitude_rabi(q0, drive_freq=f_drive_q0)
     t1_q0 = t1_measurement(q0, drive_freq=f_drive_q0, amp_pi=amp_pi_q0)
