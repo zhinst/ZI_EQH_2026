@@ -56,7 +56,10 @@ The qubits start in `|00⟩`.
    the Bell state, rotate into the chosen basis, and measure many shots. Compute
    the four correlators and the CHSH parameter `S = E(a,b) + E(a,b') + E(a',b) − E(a',b')`.
    Show `|S| > 2`.
-Tip: You need **very good** knowledge of the qubit frequency and pi-pulse amplitude to make this work.
+
+If you get stuck in this problem, don't worry. Reach out and we will help you.
+
+Tip: Keep in mind that you need **very good** knowledge of the qubit frequency and π-pulse amplitude to make this work.
 
 ### Implement measurement in LabOne Q
 
