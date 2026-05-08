@@ -68,6 +68,7 @@ qubit parameters.
     a certain experiment (e.g. qubit spectroscopy).
   - Get results, feed them to an evaluation algorithm or the LLM.
   - Prompt the LLM for the next decision step.
+    
   https://ethz.ch/en/the-eth-zurich/education/ai-in-education/tools.html
 
 ### Bell inequality violation
