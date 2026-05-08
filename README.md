@@ -48,7 +48,27 @@ sample-precise simulated outputs -- exactly what would be played on hardware.
    - Use the Ramsey method to find the precise value of the transition frequency.
    - Study how Ramsey works and implement it as a LabOne Q experiment.
 
-## Optional Stretch goals (choose one or the other)
+## Stretch goals for bonus points
+Focus on any one frist and if you are finished quickly, jump to the next problem you
+find interesting.
+
+### Speed up and authonomy of your tune-up sequence
+
+You already have your tune-up workflows. Now let's see how fast you can converge to the
+qubit parameters.
+
+1. **Optimize your experiments** to use as few pulses as necessary to sweep parameters and 
+   converge to the optimal ones.
+   For example, speed up calibration measurements using adaptive sweeps: https://arxiv.org/abs/2506.09576
+2. **Automate workflows.** LabOne Q already provides you with an automation framework.
+   Incorporate your experiments into the automation framework.
+   HINT: Check Workflows, Tasks and Automation in the LabOne Q documentation.
+3. **Generate the automation graph** on the fly using generative AI: https://arxiv.org/abs/2412.07978
+  - Prompt the LLM to generage code for adding an automation layer for
+    a certain experiment (e.g. qubit spectroscopy).
+  - Get results, feed them to an evaluation algorithm or the LLM.
+  - Prompt the LLM for the next decision step.
+  https://ethz.ch/en/the-eth-zurich/education/ai-in-education/tools.html
 
 ### Bell inequality violation
 
