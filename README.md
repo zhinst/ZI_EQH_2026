@@ -28,8 +28,7 @@ compiling it, and feeding the resulting waveform into `evolve`. We don't have a
 real qubit during the hackathon, but LabOne Q's emulation mode gives you
 sample-precise simulated outputs -- exactly what would be played on hardware.
 
-
-## Tasks
+### Preparatory Tasks
 
 1. **Find the qubit's transition frequency.** Spectroscopy: sweep the drive
    frequency and watch for an excited-state population peak.
@@ -47,10 +46,6 @@ sample-precise simulated outputs -- exactly what would be played on hardware.
 5. **Ramsey Spectroscopy.** The qubit spectroscopy is a rough method to find the qubit frequency.
    - Use the Ramsey method to find the precise value of the transition frequency.
    - Study how Ramsey works and implement it as a LabOne Q experiment.
-
-## Stretch goals for bonus points
-Focus on any one frist and if you are finished quickly, jump to the next problem you
-find interesting.
 
 ### Speed up and authonomy of your tune-up sequence
 
@@ -70,6 +65,10 @@ qubit parameters.
   - Prompt the LLM for the next decision step.
     
   https://ethz.ch/en/the-eth-zurich/education/ai-in-education/tools.html
+
+## Stretch goals (if you are finished too quicly)
+Focus on any one frist and if you are finished quickly, jump to the next problem you
+find interesting.
 
 ### Bell inequality violation
 
