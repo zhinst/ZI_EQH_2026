@@ -63,8 +63,10 @@ qubit parameters.
     a certain experiment (e.g. qubit spectroscopy).
   - Get results, feed them to an evaluation algorithm or the LLM.
   - Prompt the LLM for the next decision step.
-    
-  https://ethz.ch/en/the-eth-zurich/education/ai-in-education/tools.html
+    https://ethz.ch/en/the-eth-zurich/education/ai-in-education/tools.html
+
+These points are just to give you ideas in which direciton you can push.
+Feel free to go off the beaten path and propose something new and interesting.
 
 ## Stretch goals (if you are finished too quicly)
 Focus on any one frist and if you are finished quickly, jump to the next problem you
@@ -150,3 +152,12 @@ def main():
     amp_pi_q0 = amplitude_rabi(q0, drive_freq=f_drive_q0)
     ...
 ```
+
+## Evaluation criteria
+The evaluation criteria are the following (in order of importance):
+1. Innovation (novel algorithm/approach) in speeding up tune-up
+2. Shortest active qpu time under similar average count
+3. Completion of all preparatory steps and correct identification of qubit parameters
+4. Code quality
+
+## Happy hacking!
