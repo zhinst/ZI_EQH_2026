@@ -119,7 +119,7 @@ python main.py
 ## Tips
 
 1. Start from the [*OutputSimulator*](https://docs.zhinst.com/labone_q_user_manual/core/functionality_and_concepts/10_advanced_topics/tutorials/00_output_simulator.html) tutorial. Run through the tutorial and see how the output pulses look like. Make a function that takes the output and converts it to the format used by the `VirtualQubit`. **Note that the output simulator provides only the pulse envelope and does not include the high-frequency modulation.**
-3. Learn more about ![*Qubit Spectroscopy*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/03_qubit_spectroscopy.html), ![*Amplitude Rabi*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/04_amplitude_rabi.html), and ![*Ramsey Interferometry*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/05_ramsey.html) from the LabOne Q Applications library documentation.
+3. Learn more about [*Qubit Spectroscopy*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/03_qubit_spectroscopy.html), [*Amplitude Rabi*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/04_amplitude_rabi.html), and [*Ramsey Interferometry*](https://docs.zhinst.com/labone_q_user_manual/applications_library/how-to-guides/sources/01_superconducting_qubits/01_workflows/05_ramsey.html) from the LabOne Q Applications library documentation.
 
 ## Example code to get you started
 
